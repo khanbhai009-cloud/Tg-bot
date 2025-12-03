@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>User Panel - MiniApp</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg: var(--tg-color-scheme, light) == light ? #fff : #212121;
+            --tg-theme-text: var(--tg-color-scheme, light) == light ? #000 : #fff;
+            --tg-theme-hint: var(--tg-color-scheme, light) == light ? #999 : #999;
+            --tg-theme-link: var(--tg-color-scheme, light) == light ? #2481cc : #62b1f6;
+            --tg-theme-button: var(--tg-color-scheme, light) == light ? #50a8eb : #50a8eb;
+            --tg-theme-button-text: #fff;
+            --primary-color: var(--tg-theme-button);
+            --bg-color: var(--tg-theme-bg);
+            --text-color: var(--tg-theme-text);
+            --card-bg: var(--tg-color-scheme, light) == light ? #f0f0f0 : #333;
+            --input-bg: var(--tg-color-scheme, light) == light ? #f5f5f5 : #444;
+            --error-color: #ff3b30;
+            --success-color: #34c759;
+            --pending-color: #ff9500;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+            touch-action: manipulation;
+        }
+
+        /* Responsive Layout */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Tabs/Sections */
+        .tab-content {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: none; /* Controlled by JS */
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Navigation Bar (Mobile-first bottom navigation) */
+        .bottom-nav {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 55px;
+            background-color: var(--card-bg);
+            border-top: 1px solid var(--tg-theme-hint);
+            position: sticky;
+            bottom: 0;
+            z-index: 100;
+        }
+
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            padding: 8px 0;
+            color: var(--tg-theme-hint);
+            font-size: 12px;
+            transition: color 0.2s, background-color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+            font-weight: bold;
+        }
+        
+        /* General Elements */
+        h2, h3 {
+            margin-top: 0;
+            color: var(--text-color);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Dashboard Header */
+        .dashboard-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .profile-pic {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            object-fit: cover;
+            border: 2px solid var(--primary-color);
+        }
+
+        .user-info {
+            line-height: 1.4;
+        }
+
+        .user-info strong {
+            display: block;
+            font-size: 1.1em;
+            color: var(--text-color);
+        }
+
+        .user-info span {
+            font-size: 0.85em;
+            color: var(--tg-theme-hint);
+        }
+
+        /* Statistics Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 10px;
+            background-color: var(--input-bg);
+            border-radius: 10px;
+        }
+
+        .stat-card h3 {
+            font-size: 1.8em;
+            margin: 0;
+            color: var(--primary-color);
+        }
+
+        .stat-card p {
+            margin: 0;
+            font-size: 0.8em;
+            color: var(--tg-theme-hint);
+        }
+
+        /* Buttons */
+        .btn {
+            background-color: var(--primary-color);
+            color: var(--tg-theme-button-text);
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            width: 100%;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .btn:disabled {
+            background-color: var(--tg-theme-hint);
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 0.9em;
+            width: auto;
+            display: inline-block;
+        }
+
+        .btn-secondary {
+            background-color: var(--tg-theme-hint);
+        }
+
+        /* Task Cards */
+        .task-list .card, .withdrawal-list .card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+        }
+
+        .task-details {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+
+        .task-details strong {
+            display: block;
+            font-size: 1em;
+        }
+
+        .task-details span {
+            font-size: 0.8em;
+            color: var(--tg-theme-hint);
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        /* Inputs */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        input[type="text"], input[type="number"], .search-input {
+            width: calc(100% - 20px);
+            padding: 10px;
+            border: 1px solid var(--tg-theme-hint);
+            border-radius: 8px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, .search-input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        .search-input {
+            margin-bottom: 15px;
+        }
+
+        /* Announcement Banner */
+        .announcement-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--primary-color);
+            color: var(--tg-theme-button-text);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .announcement-banner button {
+            background: none;
+            border: none;
+            color: var(--tg-theme-button-text);
+            font-size: 1.2em;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 60px; /* Above the navigation bar */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 0 15px;
+            width: calc(100% - 30px);
+            box-sizing: border-box;
+        }
+
+        .toast {
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: var(--tg-theme-button-text);
+            text-align: center;
+            font-size: 0.9em;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateY(10px);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.success {
+            background-color: var(--success-color);
+        }
+
+        .toast.error {
+            background-color: var(--error-color);
+        }
+
+        .toast.info {
+            background-color: var(--tg-theme-link);
+        }
+
+        /* Placeholder/Skeleton Loading */
+        .skeleton {
+            background-color: var(--input-bg);
+            animation: pulse 1.5s infinite ease-in-out;
+            border-radius: 8px;
+        }
+
+        .skeleton-header {
+            height: 50px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .skeleton-stat {
+            height: 50px;
+        }
+
+        .skeleton-text {
+            height: 15px;
+            width: 70%;
+            margin-bottom: 5px;
+        }
+
+        .skeleton-card {
+            height: 50px;
+            margin-bottom: 8px;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1001;
+            color: white;
+            display: none;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        /* Withdrawal Status */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.75em;
+            font-weight: bold;
+            color: var(--tg-theme-button-text);
+        }
+
+        .status-pending { background-color: var(--pending-color); }
+        .status-approved { background-color: var(--success-color); }
+        .status-rejected { background-color: var(--error-color); }
+        
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: var(--tg-theme-hint);
+            background-color: var(--input-bg);
+            border-radius: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <div id="dashboard-tab" class="tab-content active">
+            <h2>🏠 Dashboard</h2>
+            
+            <div id="dashboard-loading" class="card">
+                <div class="skeleton-header"></div>
+                <div class="skeleton-text"></div>
+                <div class="stats-grid">
+                    <div class="skeleton skeleton-stat"></div>
+                    <div class="skeleton skeleton-stat"></div>
+                    <div class="skeleton skeleton-stat"></div>
+                    <div class="skeleton skeleton-stat"></div>
+                </div>
+            </div>
+
+            <div id="dashboard-content" style="display: none;">
+                <div id="user-header-card" class="card dashboard-header">
+                    </div>
+
+                <div id="announcement-area" style="display: none;">
+                    </div>
+
+                <div class="stats-grid" id="stats-grid">
+                    </div>
+
+                <h3>⚡ Quick Tasks</h3>
+                <div id="quick-tasks-list" class="task-list">
+                    <div class="no-data">No quick tasks available.</div>
+                </div>
+
+                <h3>🔗 Invite & Earn</h3>
+                <div class="card">
+                    <p>Share this link to invite users:</p>
+                    <input type="text" id="referral-link-input" readonly>
+                    <button class="btn btn-secondary" onclick="copyReferralLink()">Copy Link</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="task-tab" class="tab-content">
+            <h2>💰 Earn Coins</h2>
+            <input type="text" id="task-search" class="search-input" placeholder="Search by name or type..." oninput="renderAllTasks()">
+            
+            <div id="task-loading" class="card">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+            </div>
+            
+            <div id="all-tasks-list" class="task-list" style="display: none;">
+                <div class="no-data" id="no-tasks-found">No tasks available or matching your search.</div>
+            </div>
+        </div>
+
+        <div id="withdrawal-tab" class="tab-content">
+            <h2>💳 Request Withdrawal</h2>
+            <div class="card">
+                <div class="form-group">
+                    <label for="upi-id">UPI ID (e.g., name@bankname)</label>
+                    <input type="text" id="upi-id" placeholder="Your UPI ID" required>
+                </div>
+                <div class="form-group">
+                    <label for="withdrawal-amount">Amount (₹) - Max <span id="max-withdraw-amount">0</span></label>
+                    <input type="number" id="withdrawal-amount" placeholder="Min 100, Max 5000" min="100" required>
+                </div>
+                <button class="btn" id="request-withdrawal-btn" onclick="submitWithdrawal()">Request Withdrawal</button>
+            </div>
+
+            <h3>📊 Recent Withdrawals</h3>
+            <div id="withdrawal-loading" class="card">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+            </div>
+            
+            <div id="recent-withdrawals-list" class="withdrawal-list" style="display: none;">
+                <div class="no-data" id="no-withdrawals">You have no recent withdrawals.</div>
+            </div>
+        </div>
+
+        <div id="profile-tab" class="tab-content">
+            <h2>👤 My Profile</h2>
+            
+            <div id="profile-loading" class="card">
+                <div class="skeleton-header"></div>
+                <div class="skeleton-text"></div>
+                <div class="skeleton-text"></div>
+                <div class="skeleton-text" style="width: 50%"></div>
+            </div>
+            
+            <div id="profile-content" class="card" style="display: none;">
+                <div class="dashboard-header">
+                    <img id="profile-photo" class="profile-pic" src="" alt="Profile Picture">
+                    <div class="user-info">
+                        <strong id="profile-name"></strong>
+                        <span id="profile-user-id"></span>
+                    </div>
+                </div>
+                
+                <hr>
+
+                <p><strong>Referred By:</strong> <span id="profile-referred-by"></span></p>
+                <p><strong>Total Referrals:</strong> <span id="profile-total-referrals"></span></p>
+                <p><strong>Total Withdrawals:</strong> <span id="profile-total-withdrawals"></span></p>
+                <p><strong>Total Coins (₹):</strong> <span id="profile-total-coins"></span></p>
+                
+                <button class="btn" onclick="refreshProfileData()">Refresh Profile</button>
+                <button class="btn btn-secondary" onclick="copyReferralLink()">Copy My Referral Link</button>
+            </div>
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item active" data-tab="dashboard-tab" onclick="switchTabs(this, 'dashboard-tab')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                Dashboard
+            </div>
+            <div class="nav-item" data-tab="task-tab" onclick="switchTabs(this, 'task-tab')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                Tasks
+            </div>
+            <div class="nav-item" data-tab="withdrawal-tab" onclick="switchTabs(this, 'withdrawal-tab')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                Withdraw
+            </div>
+            <div class="nav-item" data-tab="profile-tab" onclick="switchTabs(this, 'profile-tab')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                Profile
+            </div>
+        </div>
+        
+        <div class="toast-container" id="toast-container"></div>
+        
+        <div class="loading-overlay" id="global-loading">Processing...</div>
+
+    </div>
+
+    <script>
+        // Placeholder for Firebase Configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyCY64NxvGWFC_SZxcAFX3ImNQwY3H-yclw",
+  authDomain: "tg-web-bot.firebaseapp.com",
+  projectId: "tg-web-bot",
+  storageBucket: "tg-web-bot.firebasestorage.app",
+  messagingSenderId: "69446541874",
+  appId: "1:69446541874:web:1ad058194db70530ff922b"
+};
+        
+        // Placeholder for Bot Username
+        const BOT_USERNAME = "task_techi_bot"; // e.g., "MyEarningBot"
+        const MIN_WITHDRAWAL_AMOUNT = 100;
+        const FIREBASE_APP_NAME = 'tgMiniApp';
+        
+        let app;
+        let db;
+        let currentUserId = null;
+        let currentUserName = "User";
+        let currentUserPhoto = "";
+        let currentUserData = null;
+        let allTasks = []; // Cache all tasks
+        
+        // --- Utility Functions ---
+
+        /**
+         * Shows a toast notification.
+         * @param {string} message The message to show.
+         * @param {'success'|'error'|'info'} type The type of notification.
+         */
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+
+            container.prepend(toast); // Prepend to show newest on top
+            
+            // Show toast
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+
+            // Hide and remove toast after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
+        
+        /**
+         * Toggles the global loading overlay.
+         * @param {boolean} show Whether to show or hide the overlay.
+         * @param {string} [message] The message to display.
+         */
+        function toggleLoading(show, message = 'Processing...') {
+            const overlay = document.getElementById('global-loading');
+            overlay.textContent = message;
+            overlay.style.display = show ? 'flex' : 'none';
+        }
+
+        // --- Telegram & Firebase Initialization ---
+        
+        /**
+         * Initializes the Telegram WebApp and extracts user/referral data.
+         */
+        function initTelegram() {
+            if (window.Telegram && Telegram.WebApp) {
+                Telegram.WebApp.ready();
+                // Auto-expand the WebApp
+                Telegram.WebApp.expand();
+                
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                const initDataUnsafe = Telegram.WebApp.initDataUnsafe;
+
+                if (user) {
+                    currentUserId = user.id.toString();
+                    currentUserName = user.first_name || user.username || "Telegram User";
+                    currentUserPhoto = user.photo_url || `https://ui-avatars.com/api/?name=${currentUserName}&background=random`;
+                    console.log("Telegram User ID:", currentUserId);
+                    
+                    // Check for referral link
+                    let referralId = null;
+                    if (initDataUnsafe.start_param) {
+                        referralId = initDataUnsafe.start_param;
+                        console.log("Referral ID found:", referralId);
+                    }
+                    
+                    initFirebase(referralId);
+                } else {
+                    document.body.innerHTML = '<h1>Error: Could not load Telegram User Data.</h1><p>Please open this WebApp from a Telegram chat.</p>';
+                }
+                
+                // Set theme colors from Telegram
+                document.documentElement.style.setProperty('--tg-color-scheme', Telegram.WebApp.colorScheme);
+            } else {
+                // Fallback for local testing (not recommended for production)
+                console.warn("Telegram WebApp not found. Using mock data.");
+                currentUserId = '123456789'; // Mock ID
+                currentUserName = 'Test User';
+                currentUserPhoto = `https://ui-avatars.com/api/?name=Test+User&background=random`;
+                initFirebase(null);
+            }
+        }
+        
+        /**
+         * Initializes Firebase and Firestore.
+         * @param {string | null} referralId The ID of the referring user, if present.
+         */
+        function initFirebase(referralId) {
+            try {
+                if (!firebase.apps.length) {
+                    app = firebase.initializeApp(firebaseConfig, FIREBASE_APP_NAME);
+                } else {
+                    app = firebase.app(FIREBASE_APP_NAME);
+                }
+                
+                db = app.firestore();
+                console.log("Firebase Initialized.");
+                
+                createOrFetchUser(referralId);
+                
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                showToast("Failed to initialize backend. Check console.", 'error');
+            }
+        }
+        
+        /**
+         * Creates a new user document or fetches an existing one.
+         * @param {string | null} referralId The ID of the referring user.
+         */
+        async function createOrFetchUser(referralId) {
+            if (!currentUserId) return;
+            
+            const userRef = db.collection('users').doc(currentUserId);
+            toggleLoading(true, "Loading user data...");
+            
+            try {
+                const doc = await userRef.get();
+                
+                if (!doc.exists) {
+                    // New User - Create document and handle referral
+                    console.log("Creating new user...");
+                    
+                    const newUser = {
+                        id: currentUserId,
+                        name: currentUserName,
+                        photoURL: currentUserPhoto,
+                        coins: 0,
+                        reffer: 0,
+                        refferBy: referralId && referralId !== currentUserId ? referralId : null,
+                        tasksCompleted: 0,
+                        totalWithdrawals: 0
+                    };
+                    
+                    await userRef.set(newUser);
+                    currentUserData = newUser;
+                    showToast("Welcome! Your account has been created.", 'success');
+                }
+                
+                // Start all realtime listeners after creation/fetch
+                setupRealtimeListeners();
+                
+            } catch (error) {
+                console.error("Error creating/fetching user:", error);
+                showToast("Failed to load user data. Try again.", 'error');
+            } finally {
+                toggleLoading(false);
+            }
+        }
+        
+        // --- Realtime Listeners ---
+        
+        /**
+         * Sets up all the Firestore onSnapshot listeners for realtime updates.
+         */
+        function setupRealtimeListeners() {
+            if (!db || !currentUserId) return;
+            
+            // 1. User Data Listener
+            db.collection('users').doc(currentUserId).onSnapshot(doc => {
+                if (doc.exists) {
+                    currentUserData = doc.data();
+                    renderDashboard(currentUserData);
+                    renderProfile(currentUserData);
+                    document.getElementById('max-withdraw-amount').textContent = currentUserData.coins.toFixed(2);
+                } else {
+                    console.error("User data not found in Firestore.");
+                }
+                document.getElementById('dashboard-loading').style.display = 'none';
+                document.getElementById('dashboard-content').style.display = 'block';
+                document.getElementById('profile-loading').style.display = 'none';
+                document.getElementById('profile-content').style.display = 'block';
+            }, error => {
+                console.error("User snapshot error:", error);
+            });
+            
+            // 2. Announcements Listener (Latest one)
+            db.collection('announcements').orderBy('createdAt', 'desc').limit(1).onSnapshot(snapshot => {
+                if (!snapshot.empty) {
+                    renderAnnouncement(snapshot.docs[0].data());
+                }
+            }, error => {
+                console.error("Announcement snapshot error:", error);
+            });
+            
+            // 3. Tasks Listener (All tasks for Tasks tab)
+            db.collection('tasks').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+                allTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderQuickTasks(allTasks.slice(0, 3)); // Top 3 for dashboard
+                renderAllTasks(); // Full list for tasks tab
+                
+                document.getElementById('task-loading').style.display = 'none';
+                document.getElementById('all-tasks-list').style.display = 'block';
+            }, error => {
+                console.error("Tasks snapshot error:", error);
+            });
+
+            // 4. Withdrawals Listener (User's recent 3)
+            db.collection('withdrawals')
+              .where('userId', '==', currentUserId)
+              .orderBy('createdAt', 'desc')
+              .limit(3)
+              .onSnapshot(snapshot => {
+                const withdrawals = snapshot.docs.map(doc => doc.data());
+                renderRecentWithdrawals(withdrawals);
+                
+                document.getElementById('withdrawal-loading').style.display = 'none';
+                document.getElementById('recent-withdrawals-list').style.display = 'block';
+            }, error => {
+                console.error("Withdrawals snapshot error:", error);
+            });
+            
+            // 5. User Claims Listener (For task status in UI)
+            // Note: This listener is less efficient if claims grow huge, but necessary for real-time UI status.
+            db.collection('user_claims').where('userId', '==', currentUserId).onSnapshot(snapshot => {
+                const claimedTaskIds = new Set(snapshot.docs.map(doc => doc.data().taskId));
+                // Rerender task lists to update 'Claimed' status
+                renderQuickTasks(allTasks.slice(0, 3), claimedTaskIds);
+                renderAllTasks(claimedTaskIds);
+            }, error => {
+                console.error("Claims snapshot error:", error);
+            });
+        }
+        
+        // --- Tab Rendering Functions ---
+        
+        /**
+         * Renders the User Dashboard (Header, Stats).
+         * @param {object} userData The current user data.
+         */
+        function renderDashboard(userData) {
+            // A) Header
+            const headerHtml = `
+                <img class="profile-pic" src="${userData.photoURL}" alt="Profile Picture">
+                <div class="user-info">
+                    <strong>${userData.name}</strong>
+                    <span>TG ID: ${userData.id}</span>
+                </div>
+            `;
+            document.getElementById('user-header-card').innerHTML = headerHtml;
+
+            // C) Statistics Cards
+            const statsHtml = `
+                <div class="stat-card">
+                    <h3 id="stat-coins">₹${userData.coins.toFixed(2)}</h3>
+                    <p>Total Coins</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-referrals">${userData.reffer}</h3>
+                    <p>Referrals</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-withdrawals">${userData.totalWithdrawals}</h3>
+                    <p>Total Withdrawals</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="stat-tasks">${userData.tasksCompleted}</h3>
+                    <p>Tasks Completed</p>
+                </div>
+            `;
+            document.getElementById('stats-grid').innerHTML = statsHtml;
+            
+            // E) Referral Link
+            const refLink = `https://t.me/${BOT_USERNAME}?start=${currentUserId}`;
+            document.getElementById('referral-link-input').value = refLink;
+        }
+
+        /**
+         * Renders the Global Announcement Banner.
+         * @param {object} announcement The latest announcement data.
+         */
+        function renderAnnouncement(announcement) {
+            const announcementArea = document.getElementById('announcement-area');
+            const dismissed = localStorage.getItem('announcement_dismissed_at') === announcement.createdAt.toDate().getTime().toString();
+            
+            if (announcement && !dismissed) {
+                announcementArea.style.display = 'flex';
+                announcementArea.className = 'announcement-banner';
+                announcementArea.innerHTML = `
+                    <span>🔔 ${announcement.title}</span>
+                    <button onclick="dismissAnnouncement('${announcement.createdAt.toDate().getTime()}')">&times;</button>
+                `;
+            } else {
+                announcementArea.style.display = 'none';
+            }
+        }
+
+        /**
+         * Dismisses the announcement banner.
+         * @param {string} timestamp The Firestore timestamp of the announcement.
+         */
+        function dismissAnnouncement(timestamp) {
+            localStorage.setItem('announcement_dismissed_at', timestamp);
+            document.getElementById('announcement-area').style.display = 'none';
+        }
+
+        /**
+         * Renders the top 3 quick action tasks on the dashboard.
+         * @param {Array<object>} tasks The list of tasks (max 3).
+         * @param {Set<string>} [claimedTaskIds] Set of IDs of tasks already claimed by the user.
+         */
+        function renderQuickTasks(tasks, claimedTaskIds = new Set()) {
+            const list = document.getElementById('quick-tasks-list');
+            list.innerHTML = '';
+            
+            if (tasks.length === 0) {
+                list.innerHTML = '<div class="no-data">No quick tasks available.</div>';
+                return;
+            }
+            
+            tasks.forEach(task => {
+                list.appendChild(createTaskCard(task, claimedTaskIds));
+            });
+        }
+
+        /**
+         * Renders the full list of tasks for the Tasks tab, including search filter.
+         * @param {Set<string>} [claimedTaskIds] Set of IDs of tasks already claimed by the user.
+         */
+        function renderAllTasks(claimedTaskIds = new Set()) {
+            const list = document.getElementById('all-tasks-list');
+            const searchInput = document.getElementById('task-search').value.toLowerCase();
+            list.innerHTML = '';
+            
+            const filteredTasks = allTasks.filter(task => 
+                task.name.toLowerCase().includes(searchInput) || 
+                task.type.toLowerCase().includes(searchInput)
+            );
+
+            if (filteredTasks.length === 0) {
+                document.getElementById('no-tasks-found').style.display = 'block';
+                return;
+            }
+            
+            document.getElementById('no-tasks-found').style.display = 'none';
+            filteredTasks.forEach(task => {
+                list.appendChild(createTaskCard(task, claimedTaskIds));
+            });
+        }
+        
+        /**
+         * Creates an HTML card element for a single task.
+         * @param {object} task The task data.
+         * @param {Set<string>} claimedTaskIds Set of claimed task IDs.
+         * @returns {HTMLElement} The task card element.
+         */
+        function createTaskCard(task, claimedTaskIds) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            
+            const isClaimed = claimedTaskIds.has(task.id);
+            
+            card.innerHTML = `
+                <div class="task-details">
+                    <strong>${task.name}</strong>
+                    <span>Type: ${task.type} | Reward: ₹${task.reward}</span>
+                </div>
+                <div class="task-actions">
+                    <button class="btn btn-small btn-secondary" onclick="window.open('${task.link}', '_blank')">Open Task</button>
+                    <button class="btn btn-small" 
+                            onclick="claimTask('${task.id}', ${task.reward})" 
+                            ${isClaimed ? 'disabled' : ''}>
+                        ${isClaimed ? 'Claimed' : 'Claim Reward'}
+                    </button>
+                </div>
+            `;
+            return card;
+        }
+
+        /**
+         * Renders the user's profile information.
+         * @param {object} userData The current user data.
+         */
+        function renderProfile(userData) {
+            document.getElementById('profile-photo').src = userData.photoURL || currentUserPhoto;
+            document.getElementById('profile-name').textContent = userData.name;
+            document.getElementById('profile-user-id').textContent = `TG ID: ${userData.id}`;
+            document.getElementById('profile-referred-by').textContent = userData.refferBy || 'None';
+            document.getElementById('profile-total-referrals').textContent = userData.reffer;
+            document.getElementById('profile-total-withdrawals').textContent = userData.totalWithdrawals;
+            document.getElementById('profile-total-coins').textContent = `₹${userData.coins.toFixed(2)}`;
+        }
+        
+        /**
+         * Renders the user's recent withdrawals.
+         * @param {Array<object>} withdrawals The list of recent withdrawals.
+         */
+        function renderRecentWithdrawals(withdrawals) {
+            const list = document.getElementById('recent-withdrawals-list');
+            list.innerHTML = '';
+            
+            if (withdrawals.length === 0) {
+                document.getElementById('no-withdrawals').style.display = 'block';
+                return;
+            }
+            document.getElementById('no-withdrawals').style.display = 'none';
+
+            withdrawals.forEach(wd => {
+                const statusClass = `status-${wd.status}`;
+                const date = wd.createdAt ? new Date(wd.createdAt.toDate()).toLocaleDateString() : 'N/A';
+                
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="task-details">
+                        <strong>₹${wd.amount.toFixed(2)} to ${wd.upi}</strong>
+                        <span>Request Date: ${date}</span>
+                    </div>
+                    <div class="task-actions">
+                        <span class="status-badge ${statusClass}">${wd.status.toUpperCase()}</span>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        // --- Action Handlers ---
+        
+        /**
+         * Handles the task claim process using a Firestore transaction.
+         * @param {string} taskId The ID of the task being claimed.
+         * @param {number} reward The coin reward for the task.
+         */
+        async function claimTask(taskId, reward) {
+            if (!currentUserId || !db) return;
+            
+            toggleLoading(true, "Claiming reward...");
+            
+            const userRef = db.collection('users').doc(currentUserId);
+            const claimRef = db.collection('user_claims').doc(`${currentUserId}_${taskId}`);
+            
+            try {
+                await db.runTransaction(async (transaction) => {
+                    const claimDoc = await transaction.get(claimRef);
+                    
+                    if (claimDoc.exists) {
+                        throw new Error("ALREADY_CLAIMED");
+                    }
+                    
+                    // 1. Create the claim record
+                    transaction.set(claimRef, {
+                        userId: currentUserId,
+                        taskId: taskId,
+                        claimedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // 2. Update user stats
+                    transaction.update(userRef, {
+                        coins: firebase.firestore.FieldValue.increment(reward),
+                        tasksCompleted: firebase.firestore.FieldValue.increment(1)
+                    });
+                });
+                
+                showToast(`Successfully claimed ₹${reward} for the task!`, 'success');
+                
+            } catch (error) {
+                if (error.message === "ALREADY_CLAIMED") {
+                    showToast("Task already claimed.", 'info');
+                } else {
+                    console.error("Transaction failed:", error);
+                    showToast("Claim failed. Please try again.", 'error');
+                }
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        /**
+         * Submits a withdrawal request.
+         */
+        async function submitWithdrawal() {
+            if (!currentUserId || !db || !currentUserData) return;
+            
+            const upiId = document.getElementById('upi-id').value.trim();
+            const amountInput = document.getElementById('withdrawal-amount').value;
+            const amount = parseFloat(amountInput);
+            const availableCoins = currentUserData.coins;
+            const requestBtn = document.getElementById('request-withdrawal-btn');
+            
+            if (!upiId || !amount || amount <= 0) {
+                showToast("Please enter a valid UPI ID and amount.", 'error');
+                return;
+            }
+
+            if (amount < MIN_WITHDRAWAL_AMOUNT) {
+                showToast(`Minimum withdrawal amount is ₹${MIN_WITHDRAWAL_AMOUNT}.`, 'error');
+                return;
+            }
+            
+            if (amount > availableCoins) {
+                showToast(`Insufficient balance. Available: ₹${availableCoins.toFixed(2)}`, 'error');
+                return;
+            }
+            
+            requestBtn.disabled = true;
+            toggleLoading(true, "Submitting withdrawal request...");
+            
+            const userRef = db.collection('users').doc(currentUserId);
+            
+            try {
+                // Use a transaction to safely decrement coins and increment withdrawal count
+                await db.runTransaction(async (transaction) => {
+                    // 1. Decrement user coins and increment total withdrawals
+                    transaction.update(userRef, {
+                        coins: firebase.firestore.FieldValue.increment(-amount),
+                        totalWithdrawals: firebase.firestore.FieldValue.increment(1)
+                    });
+                    
+                    // 2. Create withdrawal record
+                    const newWithdrawalRef = db.collection('withdrawals').doc();
+                    transaction.set(newWithdrawalRef, {
+                        userId: currentUserId,
+                        upi: upiId,
+                        amount: amount,
+                        status: 'pending',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+                
+                showToast("Withdrawal request submitted! Status: Pending", 'success');
+                document.getElementById('upi-id').value = '';
+                document.getElementById('withdrawal-amount').value = '';
+                
+            } catch (error) {
+                console.error("Withdrawal transaction failed:", error);
+                // The coins were not decremented, so we can show an error
+                showToast("Withdrawal failed. Please try again.", 'error');
+            } finally {
+                requestBtn.disabled = false;
+                toggleLoading(false);
+            }
+        }
+        
+        /**
+         * Handles copying the referral link to the clipboard.
+         */
+        function copyReferralLink() {
+            const linkInput = document.getElementById('referral-link-input');
+            linkInput.select();
+            linkInput.setSelectionRange(0, 99999); // For mobile devices
+
+            try {
+                // Use the modern navigator.clipboard API
+                navigator.clipboard.writeText(linkInput.value).then(() => {
+                    showToast("Referral link copied!", 'success');
+                }, () => {
+                    // Fallback for older browsers
+                    document.execCommand("copy");
+                    showToast("Referral link copied (fallback)!", 'success');
+                });
+            } catch (err) {
+                console.error('Copy failed:', err);
+                showToast("Failed to copy link.", 'error');
+            }
+            
+            // Unfocus the input
+            linkInput.blur();
+        }
+        
+        /**
+         * Explicitly refreshes the profile data (for the button).
+         */
+        function refreshProfileData() {
+            // Re-running the listener will automatically refresh the data
+            if (currentUserData) {
+                renderProfile(currentUserData);
+                showToast("Profile data refreshed.", 'info');
+            } else {
+                showToast("User data not yet loaded.", 'error');
+            }
+        }
+
+        // --- UI Control ---
+        
+        /**
+         * Switches between the different application tabs.
+         * @param {HTMLElement} navItem The clicked navigation element.
+         * @param {string} tabId The ID of the content section to show.
+         */
+        function switchTabs(navItem, tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Deactivate all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show the selected tab content and activate nav item
+            document.getElementById(tabId).classList.add('active');
+            navItem.classList.add('active');
+            
+            // Scroll to top of the new tab
+            const activeTab = document.getElementById(tabId);
+            if(activeTab) activeTab.scrollTop = 0;
+            
+            // Update Telegram Back Button Visibility (optional)
+            if(window.Telegram && Telegram.WebApp) {
+                Telegram.WebApp.BackButton.hide();
+            }
+        }
+
+        // Initialize the app on page load
+        document.addEventListener('DOMContentLoaded', initTelegram);
+    </script>
+</body>
+</html>
