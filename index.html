@@ -715,18 +715,7 @@ async function markFrontendOpened(userId) {
                 console.error("Firebase Initialization Error:", error);
                 showToast("Failed to initialize backend. Check console.", 'error');
             }
-        }
-        // Ensure photoURL always stays updated in Firestore
-try {
-    await userRef.set({
-        name: currentUserName,
-        photoURL: currentUserPhoto
-    }, { merge: true });
-
-    console.log("User photo updated:", currentUserPhoto);
-} catch (e) {
-    console.error("Error updating photoURL:", e);
-}
+        }       
         /**
          * Creates a new user document or fetches an existing one.
          * @param {string | null} referralId The ID of the referring user.
@@ -759,7 +748,17 @@ try {
                     currentUserData = newUser;
                     showToast("Welcome! Your account has been created.", 'success');
                 }
-                
+                // Ensure photoURL always stays updated in Firestore
+try {
+    await userRef.set({
+        name: currentUserName,
+        photoURL: currentUserPhoto
+    }, { merge: true });
+
+    console.log("User photo updated:", currentUserPhoto);
+} catch (e) {
+    console.error("Error updating photoURL:", e);
+}
                 // Start all realtime listeners after creation/fetch
                 setupRealtimeListeners();
                 // Mark frontend opened for referral system
