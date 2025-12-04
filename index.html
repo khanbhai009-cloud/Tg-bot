@@ -746,7 +746,8 @@
                 
                 // Start all realtime listeners after creation/fetch
                 setupRealtimeListeners();
-                
+                // Mark frontend opened for referral system
+await markFrontendOpened(currentUserId);
             } catch (error) {
                 console.error("Error creating/fetching user:", error);
                 showToast("Failed to load user data. Try again.", 'error');
