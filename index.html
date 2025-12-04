@@ -649,6 +649,12 @@
         /**
          * Initializes the Telegram WebApp and extracts user/referral data.
          */
+async function markFrontendOpened(userId) {
+    const userRef = db.collection('users').doc(userId);
+    await userRef.set({
+        frontendOpened: true
+    }, { merge: true });
+}
         function initTelegram() {
             if (window.Telegram && Telegram.WebApp) {
                 Telegram.WebApp.ready();
